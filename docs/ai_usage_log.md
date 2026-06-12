@@ -148,3 +148,92 @@
 ### 빌드 및 실행 테스트 결과
 - `./gradlew.bat assembleDebug` 실행 결과 `BUILD SUCCESSFUL`을 확인했다.
 - 앱 실행 테스트 결과 일정 CRUD 기능이 정상 동작함을 확인했다.
+
+## 5. OpenWeatherMap API 연동
+
+### 사용한 AI 도구
+- Codex
+
+### AI에게 요청한 내용
+- 현재 위치의 위도와 경도를 기반으로 OpenWeatherMap 현재 날씨 API를 호출하도록 요청했다.
+- Retrofit2 인터페이스, Retrofit 클라이언트, 날씨 응답 DTO, WeatherRepository를 구현하도록 요청했다.
+- API Key는 코드에 하드코딩하지 않고 `BuildConfig.OPEN_WEATHER_MAP_API_KEY`를 사용하도록 요청했다.
+- 날씨 위험 판단, 준비물 추천, 알림 기능은 아직 구현하지 않도록 요청했다.
+
+### AI가 생성하거나 수정한 코드
+- `app/src/main/java/com/sch/plancast/data/remote/OpenWeatherApi.java`
+  - OpenWeatherMap Current Weather API 호출용 Retrofit 인터페이스를 생성했다.
+  - `lat`, `lon`, `appid`, `units`, `lang` 파라미터를 전달하도록 구현했다.
+- `app/src/main/java/com/sch/plancast/data/remote/RetrofitClient.java`
+  - `https://api.openweathermap.org/`를 baseUrl로 설정했다.
+  - Gson Converter를 사용하는 Retrofit 싱글턴을 구성했다.
+- `app/src/main/java/com/sch/plancast/data/remote/dto/WeatherResponse.java`
+  - 현재 기온, 최고/최저 기온, 날씨 상태, 설명, 풍속을 파싱하는 DTO를 작성했다.
+  - null 값으로 앱이 종료되지 않도록 안전한 getter를 추가했다.
+- `app/src/main/java/com/sch/plancast/data/repository/WeatherRepository.java`
+  - OpenWeatherMap API 호출을 Repository로 감쌌다.
+  - API Key 누락, HTTP 오류, 네트워크 실패, null 응답을 오류 메시지 callback으로 처리했다.
+- `app/src/main/java/com/sch/plancast/MainActivity.java`
+  - 현재 위치 조회 성공 후 날씨 API를 호출하도록 연결했다.
+  - 날씨 조회 결과를 화면에 표시하도록 구현했다.
+- `app/src/main/res/layout/activity_main.xml`
+  - 현재 날씨 정보를 표시하는 영역을 추가했다.
+
+### 팀원이 검토한 내용
+- API Key가 코드에 직접 하드코딩되지 않았는지 확인했다.
+- `units=metric`, `lang=kr`로 호출되도록 설정되었는지 확인했다.
+- 위치 조회 실패나 권한 거부 시 날씨 API를 호출하지 않는지 확인했다.
+- 일정 CRUD 기능이 유지되는지 확인했다.
+
+### 직접 수정하거나 확인한 내용
+- Android Studio에서 빌드 결과를 확인했다.
+- API Key 활성화 문제로 실제 호출 시 HTTP 401이 발생할 수 있음을 확인했다.
+- API Key 문제는 추후 해결하기로 하고, 현재 단계에서는 API 호출 구조와 오류 처리가 정상인지 확인했다.
+
+### 빌드 및 실행 테스트 결과
+- `./gradlew.bat assembleDebug` 실행 결과 `BUILD SUCCESSFUL`을 확인했다.
+- API Key 미설정 또는 비활성 상태에서도 앱이 강제 종료되지 않고 오류 메시지를 표시하도록 확인했다.
+
+## 6. 날씨 위험 판단 및 준비물 추천 구현
+
+### 사용한 AI 도구
+- Codex
+
+### AI에게 요청한 내용
+- 현재 날씨 정보를 기반으로 위험 요소를 규칙 기반으로 판단하도록 요청했다.
+- 비, 눈, 폭염, 한파, 강풍 조건을 판단하고 준비물을 추천하도록 요청했다.
+- 여러 위험 요소가 동시에 있으면 메시지와 준비물을 함께 표시하도록 요청했다.
+- AI API는 사용하지 않고 앱 내부 규칙 로직으로 구현하도록 요청했다.
+- AlarmManager, NotificationManager 알림 기능은 아직 구현하지 않도록 요청했다.
+
+### AI가 생성하거나 수정한 코드
+- `app/src/main/java/com/sch/plancast/domain/WeatherAdviceResult.java`
+  - 위험 메시지, 추천 준비물, 위험 여부를 담는 결과 클래스를 생성했다.
+  - 화면 표시용 getter를 추가했다.
+- `app/src/main/java/com/sch/plancast/domain/WeatherAdvisor.java`
+  - `weatherMain`, `description`, `temperature`, `windSpeed` 값을 입력받아 위험 요소를 판단하도록 구현했다.
+  - 비/눈, 폭염, 한파, 강풍 규칙을 추가했다.
+  - 중복 준비물을 줄이기 위해 `LinkedHashSet`을 사용했다.
+  - null 입력에도 앱이 종료되지 않도록 처리했다.
+- `app/src/main/java/com/sch/plancast/data/repository/WeatherRepository.java`
+  - 위험 판단에 필요한 날씨 원본 값 getter를 추가했다.
+- `app/src/main/java/com/sch/plancast/MainActivity.java`
+  - 날씨 API 조회 성공 후 `WeatherAdvisor`를 호출하도록 연결했다.
+  - API 실패 시 위험 판단 영역에 안내 문구를 표시하도록 처리했다.
+- `app/src/main/res/layout/activity_main.xml`
+  - 위험 안내 TextView와 추천 준비물 TextView를 추가했다.
+
+### 팀원이 검토한 내용
+- 규칙 기반 판단 조건이 요구사항과 일치하는지 확인했다.
+- 여러 위험 요소가 동시에 표시될 수 있는지 확인했다.
+- 날씨 API 실패 시 위험 판단 영역이 안내 문구로 유지되는지 확인했다.
+- 기존 일정 CRUD, 위치 조회, 날씨 API 호출 구조가 유지되는지 확인했다.
+
+### 직접 수정하거나 확인한 내용
+- Kotlin과 Jetpack Compose 코드가 추가되지 않았는지 확인했다.
+- 알림 관련 기능이 아직 구현되지 않았는지 확인했다.
+- API Key 활성화 전에도 실패 메시지와 안내 문구가 표시되도록 확인했다.
+
+### 빌드 및 실행 테스트 결과
+- `./gradlew.bat assembleDebug` 실행 결과 `BUILD SUCCESSFUL`을 확인했다.
+- 날씨 응답을 받을 수 있는 경우 위험 안내와 추천 준비물이 화면에 표시되는 구조를 확인했다.

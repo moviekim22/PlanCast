@@ -22,6 +22,8 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.sch.plancast.data.local.ScheduleEntity;
 import com.sch.plancast.data.repository.ScheduleRepository;
 import com.sch.plancast.data.repository.WeatherRepository;
+import com.sch.plancast.domain.WeatherAdviceResult;
+import com.sch.plancast.domain.WeatherAdvisor;
 import com.sch.plancast.location.LocationProvider;
 import com.sch.plancast.ui.schedule.ScheduleAdapter;
 import com.sch.plancast.ui.schedule.ScheduleFormActivity;
@@ -37,10 +39,13 @@ public class MainActivity extends AppCompatActivity {
 
     private ScheduleRepository scheduleRepository;
     private WeatherRepository weatherRepository;
+    private WeatherAdvisor weatherAdvisor;
     private ScheduleAdapter scheduleAdapter;
     private LocationProvider locationProvider;
     private TextView locationStatusTextView;
     private TextView weatherInfoTextView;
+    private TextView weatherRiskTextView;
+    private TextView weatherRecommendationTextView;
     private TextView selectedDateTextView;
     private TextView emptyTextView;
     private String selectedDate;
@@ -58,11 +63,14 @@ public class MainActivity extends AppCompatActivity {
 
         scheduleRepository = new ScheduleRepository(this);
         weatherRepository = new WeatherRepository();
+        weatherAdvisor = new WeatherAdvisor();
         locationProvider = new LocationProvider(this);
         selectedDate = formatDate(System.currentTimeMillis());
 
         locationStatusTextView = findViewById(R.id.locationStatusTextView);
         weatherInfoTextView = findViewById(R.id.weatherInfoTextView);
+        weatherRiskTextView = findViewById(R.id.weatherRiskTextView);
+        weatherRecommendationTextView = findViewById(R.id.weatherRecommendationTextView);
         selectedDateTextView = findViewById(R.id.selectedDateTextView);
         emptyTextView = findViewById(R.id.emptyTextView);
 
@@ -161,6 +169,7 @@ public class MainActivity extends AppCompatActivity {
     private void loadCurrentLocation() {
         locationStatusTextView.setText("현재 위치를 확인하는 중입니다");
         weatherInfoTextView.setText("날씨 정보: 현재 위치 확인 후 조회합니다");
+        showWeatherAdviceUnavailable();
         locationProvider.getCurrentLocation(new LocationProvider.LocationCallback() {
             @Override
             public void onLocationReceived(double latitude, double longitude) {
@@ -180,6 +189,7 @@ public class MainActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     locationStatusTextView.setText(errorMessage);
                     weatherInfoTextView.setText("날씨 정보: 위치를 확인할 수 없어 조회하지 않았습니다");
+                    showWeatherAdviceUnavailable();
                     Toast.makeText(MainActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
                 });
             }
@@ -191,23 +201,44 @@ public class MainActivity extends AppCompatActivity {
         weatherRepository.getCurrentWeather(latitude, longitude, new WeatherRepository.WeatherCallback() {
             @Override
             public void onSuccess(WeatherRepository.WeatherInfo weatherInfo) {
-                runOnUiThread(() -> weatherInfoTextView.setText(weatherInfo.toDisplayText()));
+                runOnUiThread(() -> {
+                    weatherInfoTextView.setText(weatherInfo.toDisplayText());
+                    updateWeatherAdvice(weatherInfo);
+                });
             }
 
             @Override
             public void onError(String errorMessage) {
                 runOnUiThread(() -> {
                     weatherInfoTextView.setText(errorMessage);
+                    showWeatherAdviceUnavailable();
                     Toast.makeText(MainActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
                 });
             }
         });
     }
 
+    private void updateWeatherAdvice(WeatherRepository.WeatherInfo weatherInfo) {
+        WeatherAdviceResult adviceResult = weatherAdvisor.advise(
+                weatherInfo.getWeatherMain(),
+                weatherInfo.getWeatherDescription(),
+                weatherInfo.getCurrentTemperature(),
+                weatherInfo.getWindSpeed()
+        );
+        weatherRiskTextView.setText(adviceResult.getRiskDisplayText());
+        weatherRecommendationTextView.setText(adviceResult.getRecommendationDisplayText());
+    }
+
+    private void showWeatherAdviceUnavailable() {
+        weatherRiskTextView.setText("위험 안내: 날씨 정보를 불러온 뒤 추천을 확인할 수 있습니다.");
+        weatherRecommendationTextView.setText("추천 준비물: 날씨 정보를 불러온 뒤 확인할 수 있습니다.");
+    }
+
     private void showLocationPermissionDeniedMessage() {
         String message = "위치 권한이 없어 날씨 기능을 사용할 수 없습니다";
         locationStatusTextView.setText(message);
         weatherInfoTextView.setText("날씨 정보: 위치 권한이 필요합니다");
+        showWeatherAdviceUnavailable();
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 

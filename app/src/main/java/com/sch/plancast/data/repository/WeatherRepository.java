@@ -87,6 +87,8 @@ public class WeatherRepository {
     public static class WeatherInfo {
 
         private final String weatherStatus;
+        private final String weatherMain;
+        private final String weatherDescription;
         private final Double currentTemperature;
         private final Double maxTemperature;
         private final Double minTemperature;
@@ -94,12 +96,16 @@ public class WeatherRepository {
 
         private WeatherInfo(
                 String weatherStatus,
+                String weatherMain,
+                String weatherDescription,
                 Double currentTemperature,
                 Double maxTemperature,
                 Double minTemperature,
                 Double windSpeed
         ) {
             this.weatherStatus = weatherStatus;
+            this.weatherMain = weatherMain;
+            this.weatherDescription = weatherDescription;
             this.currentTemperature = currentTemperature;
             this.maxTemperature = maxTemperature;
             this.minTemperature = minTemperature;
@@ -113,6 +119,8 @@ public class WeatherRepository {
 
             return new WeatherInfo(
                     weatherStatus,
+                    main,
+                    description,
                     response.getCurrentTemperature(),
                     response.getMaxTemperature(),
                     response.getMinTemperature(),
@@ -127,6 +135,34 @@ public class WeatherRepository {
                     && maxTemperature != null
                     && minTemperature != null
                     && windSpeed != null;
+        }
+
+        public String getWeatherStatus() {
+            return weatherStatus;
+        }
+
+        public String getWeatherMain() {
+            return weatherMain;
+        }
+
+        public String getWeatherDescription() {
+            return weatherDescription;
+        }
+
+        public Double getCurrentTemperature() {
+            return currentTemperature;
+        }
+
+        public Double getMaxTemperature() {
+            return maxTemperature;
+        }
+
+        public Double getMinTemperature() {
+            return minTemperature;
+        }
+
+        public Double getWindSpeed() {
+            return windSpeed;
         }
 
         public String toDisplayText() {
