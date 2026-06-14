@@ -476,3 +476,51 @@
 ### 빌드 결과
 - `./gradlew.bat assembleDebug` 실행 결과 `BUILD SUCCESSFUL`을 확인했다.
 - 기존 일정 CRUD, 현재 위치 조회, Current Weather API, Forecast API, WeatherAdvisor, 기존 알림 기능을 유지한 상태로 Forecast-일정 매칭 도메인 로직만 추가했다.
+
+## 12. 매일 아침 8시 야외 일정 날씨 위험 자동 체크 알림
+
+### 사용한 AI 도구
+- Codex
+
+### 매일 아침 8시 자동 날씨 체크 기능을 추가한 이유
+- 사용자가 앱을 직접 열지 않아도 며칠 뒤 예정된 야외 일정의 위험 날씨를 미리 확인할 수 있게 하기 위해 추가했다.
+- PlanCast의 핵심 기능은 일정과 날씨를 함께 관리하는 것이므로, 매일 아침 한 번 자동 점검을 수행하면 사용자가 우산, 방수 신발, 외투 같은 준비물을 놓치지 않을 수 있다.
+- 정확한 초 단위 실행이 필요하지 않은 과제 앱이므로 Android 12 이상 exact alarm 권한이 필요한 방식은 사용하지 않고, 반복 알람 방식으로 구현했다.
+
+### Forecast API, 야외 일정 조회, ForecastScheduleMatcher를 연결한 방식
+- `ScheduleRepository.getOutdoorSchedulesWithinFiveDays(...)`로 오늘부터 5일 뒤까지의 야외 일정만 조회한다.
+- `WeatherRepository.getForecast(...)`로 마지막 저장 위치 기준 5일 예보를 가져온다.
+- `ForecastScheduleMatcher`가 야외 일정 시간과 Forecast 예보 시간 중 가장 가까운 항목을 매칭한다.
+- 위험 일정이 하나 이상 있으면 `NotificationHelper`를 통해 상단바 알림을 한 번만 표시한다.
+
+### SharedPreferences에 마지막 위치를 저장한 이유
+- BroadcastReceiver 안에서는 위치 권한 요청 팝업을 띄우지 않는 것이 안전하다.
+- 백그라운드 자동 체크는 사용자가 마지막으로 앱에서 위치 조회에 성공했을 때 저장된 위도/경도를 사용한다.
+- 저장된 위치가 없으면 자동 체크 작업을 조용히 종료하여 앱이 강제 종료되지 않도록 했다.
+
+### 생성/수정된 코드
+- `app/src/main/java/com/sch/plancast/notification/DailyWeatherCheckReceiver.java`
+  - `BroadcastReceiver`를 생성하고 `goAsync()`로 비동기 DB 조회와 네트워크 호출을 처리했다.
+  - 향후 5일 이내 야외 일정 조회, 마지막 위치 확인, Forecast API 호출, Forecast-일정 매칭, 위험 알림 표시를 연결했다.
+  - 성공/실패 모든 경로에서 `pendingResult.finish()`가 호출되도록 처리했다.
+- `app/src/main/java/com/sch/plancast/notification/AlarmScheduler.java`
+  - `scheduleDailyWeatherCheck(Context context)` 메서드를 추가했다.
+  - 매일 오전 8시에 `DailyWeatherCheckReceiver`가 실행되도록 `setInexactRepeating`을 사용했다.
+  - 같은 requestCode를 사용해 중복 예약을 방지했다.
+- `app/src/main/java/com/sch/plancast/MainActivity.java`
+  - 현재 위치 조회 성공 시 위도/경도를 SharedPreferences에 저장하도록 수정했다.
+  - `onCreate()`에서 매일 오전 8시 자동 체크 알람을 예약하도록 연결했다.
+- `app/src/main/AndroidManifest.xml`
+  - `DailyWeatherCheckReceiver`를 등록했다.
+  - `BOOT_COMPLETED` 권한이나 재부팅 후 복구 로직은 추가하지 않았다.
+
+### 팀원이 검토해야 할 내용
+- Receiver에서 위치 권한 요청 UI를 띄우지 않고 마지막 저장 위치만 사용하는지 확인한다.
+- 저장된 위치가 없거나 일정이 없거나 네트워크 실패가 발생해도 앱이 종료되지 않는지 확인한다.
+- 위험 일정이 여러 개여도 알림이 한 번만 표시되는지 확인한다.
+- `setExactAndAllowWhileIdle`이 아니라 `setInexactRepeating`을 사용해 exact alarm 권한 문제를 피했는지 확인한다.
+- 기존 일정 CRUD, 현재 위치 조회, Current Weather API, Forecast API, WeatherAdvisor, 기존 일정 알림 기능이 유지되는지 확인한다.
+
+### 빌드 결과
+- `./gradlew.bat assembleDebug` 실행 결과 `BUILD SUCCESSFUL`을 확인했다.
+- 기존 기능을 유지한 상태로 매일 아침 8시 야외 일정 날씨 위험 자동 체크 알림 흐름을 연결했다.

@@ -16,6 +16,8 @@ import java.util.Locale;
 public class AlarmScheduler {
 
     private static final int NOTIFICATION_LEAD_MINUTES = 30;
+    private static final int DAILY_WEATHER_CHECK_REQUEST_CODE = 8000;
+    private static final int DAILY_WEATHER_CHECK_HOUR = 8;
 
     public void scheduleNotification(Context context, ScheduleEntity schedule) {
         if (context == null || schedule == null || schedule.getId() <= 0) {
@@ -86,6 +88,29 @@ public class AlarmScheduler {
         pendingIntent.cancel();
     }
 
+    public void scheduleDailyWeatherCheck(Context context) {
+        if (context == null) {
+            return;
+        }
+
+        AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        if (alarmManager == null) {
+            return;
+        }
+
+        PendingIntent pendingIntent = createDailyWeatherCheckPendingIntent(context);
+        Calendar triggerTime = getNextDailyWeatherCheckTime();
+
+        // 매일 오전 8시쯤 실행되는 반복 알람입니다.
+        // 정확한 초 단위 실행이 필요하지 않으므로 exact alarm 권한이 필요한 API는 사용하지 않습니다.
+        alarmManager.setInexactRepeating(
+                AlarmManager.RTC_WAKEUP,
+                triggerTime.getTimeInMillis(),
+                AlarmManager.INTERVAL_DAY,
+                pendingIntent
+        );
+    }
+
     private PendingIntent createPendingIntent(Context context, ScheduleEntity schedule, int flag) {
         Intent intent = new Intent(context, PlanAlarmReceiver.class);
         intent.setAction(PlanAlarmReceiver.ACTION_SCHEDULE_ALARM);
@@ -101,6 +126,31 @@ public class AlarmScheduler {
                 intent,
                 flag | getImmutableFlag()
         );
+    }
+
+    private PendingIntent createDailyWeatherCheckPendingIntent(Context context) {
+        Intent intent = new Intent(context, DailyWeatherCheckReceiver.class);
+        intent.setAction(DailyWeatherCheckReceiver.ACTION_DAILY_WEATHER_CHECK);
+
+        return PendingIntent.getBroadcast(
+                context,
+                DAILY_WEATHER_CHECK_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | getImmutableFlag()
+        );
+    }
+
+    private Calendar getNextDailyWeatherCheckTime() {
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(Calendar.HOUR_OF_DAY, DAILY_WEATHER_CHECK_HOUR);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+
+        if (calendar.getTimeInMillis() <= System.currentTimeMillis()) {
+            calendar.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        return calendar;
     }
 
     private int getImmutableFlag() {

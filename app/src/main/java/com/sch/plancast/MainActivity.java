@@ -2,6 +2,7 @@ package com.sch.plancast;
 
 import android.Manifest;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -28,6 +29,8 @@ import com.sch.plancast.data.repository.WeatherRepository;
 import com.sch.plancast.domain.WeatherAdviceResult;
 import com.sch.plancast.domain.WeatherAdvisor;
 import com.sch.plancast.location.LocationProvider;
+import com.sch.plancast.notification.AlarmScheduler;
+import com.sch.plancast.notification.DailyWeatherCheckReceiver;
 import com.sch.plancast.ui.schedule.ScheduleAdapter;
 import com.sch.plancast.ui.schedule.ScheduleFormActivity;
 
@@ -116,6 +119,7 @@ public class MainActivity extends AppCompatActivity {
 
         updateSelectedDateLabel();
         checkLocationPermissionAndLoadLocation();
+        new AlarmScheduler().scheduleDailyWeatherCheck(this);
     }
 
     @Override
@@ -225,6 +229,7 @@ public class MainActivity extends AppCompatActivity {
         locationProvider.getCurrentLocation(new LocationProvider.LocationCallback() {
             @Override
             public void onLocationReceived(double latitude, double longitude) {
+                saveLastLocation(latitude, longitude);
                 new Thread(() -> {
                     String address = getAddressFromLocation(latitude, longitude);
                     runOnUiThread(() -> {
@@ -244,6 +249,21 @@ public class MainActivity extends AppCompatActivity {
                 });
             }
         });
+    }
+
+    private void saveLastLocation(double latitude, double longitude) {
+        SharedPreferences sharedPreferences = getSharedPreferences(
+                DailyWeatherCheckReceiver.WEATHER_PREFS_NAME,
+                MODE_PRIVATE
+        );
+
+        // BroadcastReceiver는 권한 요청 UI를 띄울 수 없으므로,
+        // 메인 화면에서 위치 조회에 성공했을 때 마지막 좌표를 저장해 둡니다.
+        sharedPreferences.edit()
+                .putBoolean(DailyWeatherCheckReceiver.KEY_HAS_LAST_LOCATION, true)
+                .putString(DailyWeatherCheckReceiver.KEY_LAST_LATITUDE, String.valueOf(latitude))
+                .putString(DailyWeatherCheckReceiver.KEY_LAST_LONGITUDE, String.valueOf(longitude))
+                .apply();
     }
 
     private String getAddressFromLocation(double latitude, double longitude) {

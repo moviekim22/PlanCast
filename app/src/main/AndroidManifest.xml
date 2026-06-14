@@ -17,6 +17,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PlanCast">
         <receiver
+            android:name=".notification.DailyWeatherCheckReceiver"
+            android:exported="false" />
+        <receiver
             android:name=".notification.PlanAlarmReceiver"
             android:exported="false" />
         <activity
